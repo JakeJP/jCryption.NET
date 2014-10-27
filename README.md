@@ -3,7 +3,7 @@ jCryption.NET
 
 jCryption.NET is a server side implementation for ASP.NET and jQuery client side form data encryption library **jCryption**.
 
-jCryption was originally created by http://www.jcryption.org/
+jCryption was originally created by Daniel Griesser http://www.jcryption.org/
 
 jCryption provides an easy way to encrypt form data posted to an unsecure server through HTTP.
 
@@ -14,18 +14,22 @@ What's notable of this ASP.NET server side library:
 
   - Respecting original jCryption protocol (OpenSSL PEM style format and negotiation)
   - OpenSSL independent ( using .NET native RSA/AES crypto library )
+  - RSA keys are automatically generated
   - Integration with ASPX and CSHTML (WebPages) Request.Form is automatically replaced with decrypted content.
+  - Silently deactivates under HTTPS secure connection ( with cshtml helper methods )
    
   
   
 Known problems:
- - jQuery client side validation does not work. ( but form itself should work )
+ - ~~~jQuery client side validation does not work. ( but form itself should work )~~~
 
 
 Version
 ----
+####1.0.1
+ - now works with jquery.validate
 
-1.0
+####1.0
 
 Dependency
 ---
@@ -52,7 +56,7 @@ Make ASPX page inherit jCryption.SecurePage. SecurePage handles the negotiations
 <%@  Language="C#" Inherits="jCryption.SecurePage" %>
 <html>
     <head>
-		<script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    	<script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
 		<script type="text/javascript" src="Scripts/jquery.jcryption.3.0.1.js"></script>
 		<script type="text/javascript">
 		    $(function () {
@@ -70,8 +74,8 @@ Make ASPX page inherit jCryption.SecurePage. SecurePage handles the negotiations
 ####CSHTML
  1. declare namespace access to 'jCryption' on the top of page.
  2. call jCryption.HandleRequest(Request) to handle all background negotiations.
- 3. include all needed scripts ( jQuery and jCryption javascript files )
- 3. call jCryption.RenderScriptFor("<jQuery selector for form>") in the page ( typically in head )
+ 3. include all depending scripts ( jQuery )
+ 3. call jCryption.RenderScriptFor("```jQuery selector for form```", "```path to jcryption.js``` *optional*") in the page ( typically in head ). ( The case with jquery validate, code should be placed after jquery.validate include. )
  
 
 
@@ -84,9 +88,12 @@ Make ASPX page inherit jCryption.SecurePage. SecurePage handles the negotiations
 <html>
 <head>
     <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
-    <script type="text/javascript" src="Scripts/jquery.jcryption.3.0.1.js"></script>
-    @jCryption.RenderScriptFor("#normal")
+    @jCryption.RenderScriptFor("#normal", "Scripts/jquery.jcryption.3.0.1.js")
 </head>
+......
+<form id="normal">
+.....
+</form>
 ......
 
 ```
@@ -100,4 +107,4 @@ License
 
 MIT
 
-[Jake Y.Yoshimura]: yo-ki@yo-ki.com
+[Jake Y.Yoshimura]: http://www.yo-ki.com/

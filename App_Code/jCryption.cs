@@ -545,13 +545,34 @@ namespace jCryption
         /// </example>
         /// <param name="formSelector">jQuery selector, which specifies the 'form' element.</param>
         /// <returns></returns>
-        public static IHtmlString RenderScriptFor(String formSelector)
+        public static IHtmlString RenderScriptFor(String formSelector, String pathToJS = null )
         {
             if (HttpContext.Current.Request.IsSecureConnection) return null;
             var path = HttpContext.Current.Request.Path;
-            return new HtmlString(@"<script type=""text/javascript"">$(document).ready(function () { $('" + formSelector + @"').jCryption({ getKeysURL: '" +
-                    path + "?getPublicKey=true', handshakeURL: '" + path + "?handshake=true' }); });</script>");
-
+            return new HtmlString( ( pathToJS == null ? "" : @"<script type=""text/javascript"" src=""" + pathToJS + @"""></script>" ) +
+                @"
+        <script type=""text/javascript"">
+        $(document).ready(function () {
+        var form = $('" + formSelector + @"'), hasValidator = !!form.data('validator');
+        if (hasValidator) {
+            var v = form.validate();
+            v.settings.submitHandler = function (_form, event) {
+                var form = $(_form);
+                if (!form.hasClass('jc-before-submit')) {
+                    v.settings.submitHandler = null;
+                    form.addClass('jc-before-submit');
+                    form.trigger('_jc_submit', event);
+                }
+            };
+        }
+        form.jCryption({
+            getKeysURL: '" + path + @"?getPublicKey=true',
+            handshakeURL: '" + path + @"?handshake=true',
+            submitElement: hasValidator ? form : false,
+            submitEvent: hasValidator ? '_jc_submit' : 'click'
+        });
+    }); </script>"
+                             );
         }
     }
 }
