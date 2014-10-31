@@ -1,5 +1,6 @@
 ﻿/*
- * jCryption.NET is a server side implementation for jCryption v3.0 and ASP.NET
+ * jCryption.NET v 1.1
+ * is a server side implementation for jCryption v3.0 and ASP.NET
  * written by Jake.Y.Yoshimura
  * MIT license.
  * http://www.opensource.org/licenses/mit-license.php
@@ -318,6 +319,36 @@ namespace jCryption
                 Response.ContentType = "application/json";
                 Response.End();
             }
+            else if (Request.QueryString["decode"] != null)
+            {
+                var data = System.Web.Security.MachineKey.Decode(Request.Form["data"], System.Web.Security.MachineKeyProtection.All);
+
+                var keyDecrypted = (byte[])Session["_key"];
+
+                byte[] saltBytes = new byte[8];
+                System.Buffer.BlockCopy(keyDecrypted, 0, saltBytes, 0, 8);
+                byte[] toBeEncrypted = new byte[keyDecrypted.Length - 8];
+                System.Buffer.BlockCopy(keyDecrypted, 0, toBeEncrypted, 0, keyDecrypted.Length - 8);
+
+                var kd = new OpenSslCompatDeriveBytes(keyDecrypted, saltBytes, "MD5", 1);// new Rfc2898DeriveBytes(keyDecrypted, saltBytes, 1000);
+                var aesProvider = new AesCryptoServiceProvider() { KeySize = 256, BlockSize = 128, Mode = CipherMode.CBC };
+                var encrypter = aesProvider.CreateEncryptor(kd.GetBytes(aesProvider.KeySize / 8), kd.GetBytes(aesProvider.BlockSize / 8));
+                using (var ms = new System.IO.MemoryStream())
+                using (var writer = new System.IO.BinaryWriter(ms))
+                {
+                    writer.Write(Encoding.ASCII.GetBytes("Salted__"));
+                    writer.Write(saltBytes);
+                    writer.Write(encrypter.TransformFinalBlock(data, 0, data.Length));
+                    writer.Flush();
+                    Response.Write(conv.Serialize(new
+                    {
+                        data = Convert.ToBase64String(ms.GetBuffer(), 0, (int)ms.Length)
+                    }));
+                }
+                Response.ContentType = "application/json";
+                Response.End();
+
+            }
             else if (Request.Form["jCryption"] != null)
             {
                 NameValueCollection tempForm;
@@ -352,6 +383,7 @@ namespace jCryption
                 propInfo.SetValue(collection, true, new object[] { });
                 //
             }
+
         }
     }
     /// <summary>
@@ -523,7 +555,7 @@ namespace jCryption
     }
 
     /// <summary>
-    /// Summary description for jCryption
+    /// ASP.NET WebPages helper library
     /// </summary>
     public static class jCryption
     {
@@ -547,7 +579,7 @@ namespace jCryption
         /// <returns></returns>
         public static IHtmlString RenderScriptFor(String formSelector, String pathToJS = null )
         {
-            if (HttpContext.Current.Request.IsSecureConnection) return null;
+            if (!Enabled) return null;
             var path = HttpContext.Current.Request.Path;
             return new HtmlString( ( pathToJS == null ? "" : @"<script type=""text/javascript"" src=""" + pathToJS + @"""></script>" ) +
                 @"
@@ -556,12 +588,14 @@ namespace jCryption
         var form = $('" + formSelector + @"'), hasValidator = !!form.data('validator');
         if (hasValidator) {
             var v = form.validate();
+            var prev_handler = v.settings.submitHandler;
             v.settings.submitHandler = function (_form, event) {
+                if( prev_handler ) prev_handler.apply(this, arguments);
                 var form = $(_form);
                 if (!form.hasClass('jc-before-submit')) {
-                    v.settings.submitHandler = null;
+                    v.settings.submitHandler = prev_handler;
                     form.addClass('jc-before-submit');
-                    form.trigger('_jc_submit', event);
+                    setTimeout( function(){ form.trigger('_jc_submit', event); }, 100 );
                 }
             };
         }
@@ -569,10 +603,134 @@ namespace jCryption
             getKeysURL: '" + path + @"?getPublicKey=true',
             handshakeURL: '" + path + @"?handshake=true',
             submitElement: hasValidator ? form : false,
-            submitEvent: hasValidator ? '_jc_submit' : 'click'
+            submitEvent: hasValidator ? '_jc_submit' : 'click',
+            beforeEncryption: function(){ 
+                form.removeAttr('disabled');// form element hack ( IE11 )
+                return true;
+            }
         });
     }); </script>"
                              );
+        }
+
+        private const String jCryptionFormDataKey = "__jcryption_form_data__";
+        private const String jCryptionEnabledKey = "__jcryption_enabled__";
+        public static bool Enabled
+        {
+            get {
+                if (!HttpContext.Current.Items.Contains(jCryptionEnabledKey))
+                {
+                    HttpContext.Current.Items[jCryptionEnabledKey] = !HttpContext.Current.Request.IsSecureConnection;
+                }
+                return (bool)HttpContext.Current.Items[jCryptionEnabledKey]; 
+            }
+            set {
+                HttpContext.Current.Items[jCryptionEnabledKey] = value;
+            }
+        }
+
+        private static void AddFormNameValue(String name, String value)
+        {
+            var data = (Dictionary<String, String>)HttpContext.Current.Items[jCryptionFormDataKey];
+            if (data == null)
+            {
+                data = new Dictionary<String,String>();
+                HttpContext.Current.Items[jCryptionFormDataKey] = data; 
+            }
+            var n = System.Web.HttpUtility.UrlPathEncode(name);
+            var v = System.Web.HttpUtility.UrlPathEncode(value);
+            if (data.ContainsKey(n)) data[n] = data[n] + "," + v;
+            else data[n] = v;
+        }
+        public static IHtmlString SecureNameValue(String name, String value )
+        {
+            if (!Enabled)
+                return new HtmlString(@"name=""" + HttpUtility.HtmlEncode(name) + @""" value=""" + HttpUtility.HtmlEncode(value) + @""""  );
+            else
+            {
+                AddFormNameValue(name, value);
+                return new HtmlString(@"name=""" + HttpUtility.HtmlEncode(name) + @""" data-jcryption-item=""true""" );
+            }
+        }
+        public static IHtmlString SecureNameValueCheck(String name, String value, bool check = false)
+        {
+            if (!Enabled)
+                return new HtmlString(@"name=""" + HttpUtility.HtmlEncode(name) + @""" value=""" + HttpUtility.HtmlEncode(value) + @"""" + (check ? " checked" : "") );
+            else
+            {
+                if (check) AddFormNameValue(name, value);
+                return new HtmlString(@"name=""" + HttpUtility.HtmlEncode(name) + @""" value=""" + HttpUtility.HtmlEncode(value) + @""" data-jcryption-item=""true""");
+            }
+        }
+        public static IHtmlString RenderLoadFormData()
+        {
+            if (!Enabled) return new HtmlString(String.Empty);
+
+            var data = (Dictionary<String, String>)HttpContext.Current.Items[jCryptionFormDataKey];
+            if (data == null || data.Count == 0) return new HtmlString(String.Empty);
+            var conv = new System.Web.Script.Serialization.JavaScriptSerializer();
+            String s = conv.Serialize(data);
+
+            var path = HttpContext.Current.Request.Path;
+
+            return new HtmlString(
+                    @"<script type=""text/javascript"">
+        $(document).ready(function () {
+            $('form').filter(function () { return !!$(this).data('jCryption'); }).each(function(){
+                var form = $(this);
+                form.find('select[data-jcryption-item],input[data-jcryption-item]').prop('disabled', true );
+                form.data('jCryption').authenticate(function (AESKey) {
+                    var data = '" + System.Web.Security.MachineKey.Encode(Encoding.UTF8.GetBytes(s), System.Web.Security.MachineKeyProtection.All) + @"';
+                    $.ajax({
+                        url: '" + path + @"?decode=true',
+                        dataType: 'json',
+                        type: 'POST',
+                        data: {
+                            data: data
+                        },
+                        success: function (response) {
+                            var data = $.parseJSON($.jCryption.decrypt(response.data, AESKey));
+                            for (var n in data) {
+                                var val = data[n];
+                                if( val == null ) continue;
+                                val = decodeURIComponent( val );
+                                n =  decodeURIComponent( n );
+                                form.find('*[name=""' + n + '""]').each(function () {
+                                    var e = $(this);
+                                    if (e.is('[type=checkbox],[type=radio]')) {
+                                        var ov = e.attr('value');
+                                        if ( ov == val || new RegExp( '(^|,)' + escapeRegExp(ov) + '($|,)' ).test(val) ) {
+                                            e.prop('checked', true);
+                                        }
+                                    } else if (e.is('select[multiple]')) {
+                                        e.find('option[value]').each(function () {
+                                            var ee = $(this), ov = ee.attr('value');
+                                            if ( ov == val || new RegExp( '(^|,)' + escapeRegExp(ov) + '($|,)' ).test(val) ) {
+                                                ee.prop('selected', true);
+                                            }
+                                        });
+
+                                    } else {
+                                        e.val(val);
+                                    }
+                                });
+                            }
+                            form.find('select[data-jcryption-item],input[data-jcryption-item]').prop('disabled', false );
+                        
+                        }
+                    });
+                }, function() {
+                // Authentication failed
+                });
+            });
+            function escapeRegExp(str) {
+              return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, ""\\$&"");
+            }
+        });
+    </script>"
+
+                );
+
         }
     }
 }
