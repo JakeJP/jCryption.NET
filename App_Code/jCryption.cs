@@ -585,8 +585,10 @@ namespace jCryption
         /// This method call should be placed on top of cshtml.
         /// </summary>
         /// <param name="request">WePages' Request object</param>
-        public static void HandleRequest(HttpRequestBase request)
+        public static void HandleRequest(HttpRequestBase request, String serviceUrl = null )
         {
+            request.RequestContext.HttpContext.Items[jCryptionServiceUrlKey] = serviceUrl ?? new Uri(request.Url, request.RawUrl).LocalPath;
+
             global::jCryption.Utility.ProcessRequest(request.RequestContext.HttpContext, cryptoProvider);
         }
         /// <summary>
@@ -641,7 +643,7 @@ namespace jCryption
             }
             if (!String.IsNullOrEmpty(formSelector))
             {
-                var path = HttpContext.Current.Request.Path;
+                var path = ServiceUrl;
                 sb.Append(@"
         <script type=""text/javascript"">
             $(document).ready(function(){
@@ -657,6 +659,7 @@ namespace jCryption
 
         private const String jCryptionFormDataKey = "__jcryption_form_data__";
         private const String jCryptionEnabledKey = "__jcryption_enabled__";
+        private const String jCryptionServiceUrlKey = "__jcryption_service_url__";
         public static bool Enabled
         {
             get {
@@ -670,7 +673,13 @@ namespace jCryption
                 HttpContext.Current.Items[jCryptionEnabledKey] = value;
             }
         }
-
+        public static String ServiceUrl
+        {
+            get
+            {
+                return HttpContext.Current.Items.Contains(jCryptionServiceUrlKey) ? (String)HttpContext.Current.Items[jCryptionServiceUrlKey] : HttpContext.Current.Request.Path;
+            }
+        }
         private static void AddFormNameValue(String name, String value)
         {
             var data = (Dictionary<String, String>)HttpContext.Current.Items[jCryptionFormDataKey];
@@ -708,7 +717,7 @@ namespace jCryption
         public static IHtmlString LoadSecureContents()
         {
             if (!Enabled) return new HtmlString(String.Empty);
-            var path = HttpContext.Current.Request.Path;
+            var path = ServiceUrl;
 
             var sb = new StringBuilder(
         @"<script type=""text/javascript"">
@@ -721,13 +730,12 @@ namespace jCryption
                 form.jCryption({ getKeysURL: url + '?getPublicKey=true',handshakeURL: url + '?handshake=true' });");
 
             var data = (Dictionary<String, String>)HttpContext.Current.Items[jCryptionFormDataKey];
+            sb.Append("var formdata = ");
             if (data != null && data.Count > 0){
-                var conv = new System.Web.Script.Serialization.JavaScriptSerializer();
-                String s = conv.Serialize(data);
-                sb.Append(@"
-                    var formdata = '" + System.Web.Security.MachineKey.Encode(Encoding.UTF8.GetBytes(s), System.Web.Security.MachineKeyProtection.All) + @"';
-                ");
-            }
+                sb.Append(@"'")
+                    .Append( System.Web.Security.MachineKey.Encode(Encoding.UTF8.GetBytes(new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(data)), System.Web.Security.MachineKeyProtection.All) )
+                    .Append(@"';");
+            } else { sb.Append("null;"); }
             sb.Append(@"
             form.data('jCryption').authenticate(function (AESKey) {
                 $.jCryption.encryptKey(AESKey, function(AESEncryptedKey) {
