@@ -1,5 +1,5 @@
 ﻿/*
- * jCryption.NET v 1.1
+ * jCryption.NET v 1.3
  * is a server side implementation for jCryption v3.0 and ASP.NET
  * written by Jake.Y.Yoshimura
  * MIT license.
@@ -278,6 +278,7 @@ namespace jCryption
 
         }
 
+        const String SessionKeyStoreKey = "jcryption_aes_key";
         public static void ProcessRequest(HttpContextBase context, RSACryptoServiceProvider cryptoProvider)
         {
             if (context.Request.IsSecureConnection) return;
@@ -295,7 +296,7 @@ namespace jCryption
             {
                 var key = Convert.FromBase64String(Request.Form["key"]);
                 var keyDecrypted = cryptoProvider.Decrypt(key, false);
-                Session["_key"] = keyDecrypted;
+                Session[SessionKeyStoreKey] = keyDecrypted;
                 byte[] saltBytes = new byte[8];
                 System.Buffer.BlockCopy(keyDecrypted, 0, saltBytes, 0, 8);
                 byte[] toBeEncrypted = new byte[keyDecrypted.Length - 8];
@@ -317,13 +318,19 @@ namespace jCryption
                     }));
                 }
                 Response.ContentType = "application/json";
+                Response.Cache.SetNoStore();
                 Response.End();
             }
             else if (Request.QueryString["decode"] != null)
             {
                 var data = System.Web.Security.MachineKey.Decode(Request.Form["data"], System.Web.Security.MachineKeyProtection.All);
 
-                var keyDecrypted = (byte[])Session["_key"];
+                byte[] keyDecrypted = Request.Form["key"] != null ? cryptoProvider.Decrypt(Convert.FromBase64String(Request.Form["key"]), false) : (byte[])Session[SessionKeyStoreKey];
+                if (keyDecrypted == null)
+                {
+                    Response.StatusCode = 412;
+                    Response.End();
+                }
 
                 byte[] saltBytes = new byte[8];
                 System.Buffer.BlockCopy(keyDecrypted, 0, saltBytes, 0, 8);
@@ -346,13 +353,14 @@ namespace jCryption
                     }));
                 }
                 Response.ContentType = "application/json";
+                Response.Cache.SetNoStore();
                 Response.End();
 
             }
             else if (Request.Form["jCryption"] != null)
             {
                 NameValueCollection tempForm;
-                var keyDecrypted = (byte[])Session["_key"];
+                byte[] keyDecrypted = Request.Form["key"] != null ? cryptoProvider.Decrypt(Convert.FromBase64String(Request.Form["key"]), false) : (byte[])Session[SessionKeyStoreKey];
                 if (keyDecrypted == null)
                 {
                     Response.StatusCode = 412;
@@ -559,7 +567,19 @@ namespace jCryption
     /// </summary>
     public static class jCryption
     {
-        static RSACryptoServiceProvider cryptoProvider = new RSACryptoServiceProvider(1024);
+        static private RSACryptoServiceProvider _cp = null;
+        static private readonly object _cpLock = new object();
+        static RSACryptoServiceProvider cryptoProvider {
+            get
+            {
+                if (_cp != null) return _cp;
+                lock (_cpLock)
+                {
+                    _cp = new RSACryptoServiceProvider(1024);
+                }
+                return _cp;
+            }
+        }
         /// <summary>
         /// declare to handle request to respond to RSA public key exchange.
         /// This method call should be placed on top of cshtml.
@@ -577,40 +597,62 @@ namespace jCryption
         /// </example>
         /// <param name="formSelector">jQuery selector, which specifies the 'form' element.</param>
         /// <returns></returns>
-        public static IHtmlString RenderScriptFor(String formSelector, String pathToJS = null )
+        public static IHtmlString RenderScriptFor(String formSelector, String src = null )
         {
             if (!Enabled) return null;
-            var path = HttpContext.Current.Request.Path;
-            return new HtmlString( ( pathToJS == null ? "" : @"<script type=""text/javascript"" src=""" + pathToJS + @"""></script>" ) +
-                @"
-        <script type=""text/javascript"">
-        $(document).ready(function () {
-        var form = $('" + formSelector + @"'), hasValidator = !!form.data('validator');
-        if (hasValidator) {
-            var v = form.validate();
-            var prev_handler = v.settings.submitHandler;
-            v.settings.submitHandler = function (_form, event) {
-                if( prev_handler ) prev_handler.apply(this, arguments);
-                var form = $(_form);
-                if (!form.hasClass('jc-before-submit')) {
-                    v.settings.submitHandler = prev_handler;
-                    form.addClass('jc-before-submit');
-                    setTimeout( function(){ form.trigger('_jc_submit', event); }, 100 );
+            var sb = new StringBuilder();
+            if (!String.IsNullOrEmpty(src)) { 
+                sb.Append(@"<script type=""text/javascript"" src=""" + src + @"""></script>");
+                sb.Append(@"
+            <script type=""text/javascript"">
+            // tweak for compatibility with jquery.validate
+            (function($){
+                var _jCryption = $.jCryption;
+                var jCryptionMod = function(el,options){
+                    var form = $(el), hasValidator = !!form.data('validator');
+                    if (hasValidator) {
+                        var v = form.validate();
+                        var prev_handler = v.settings.submitHandler;
+                        v.settings.submitHandler = function (_form, event) {
+                            if( prev_handler ) prev_handler.apply(this, arguments);
+                            var form = $(_form);
+                            if (!form.hasClass('jc-before-submit')) {
+                                v.settings.submitHandler = prev_handler;
+                                form.addClass('jc-before-submit');
+                                setTimeout( function(){ form.trigger('_jc_submit', event); }, 100 );
+                            }
+                        };
+                        _jCryption.call(this, form, $.extend( options, {
+                            submitElement: form,
+                            submitEvent: '_jc_submit',
+                            beforeEncryption: function(){ 
+                                form.removeAttr('disabled');// form element hack ( IE11 )
+                                return true;
+                            }
+                        }));
+                    } else {
+                        return _jCryption.call(this,el,options);
+                    }
                 }
-            };
-        }
-        form.jCryption({
-            getKeysURL: '" + path + @"?getPublicKey=true',
-            handshakeURL: '" + path + @"?handshake=true',
-            submitElement: hasValidator ? form : false,
-            submitEvent: hasValidator ? '_jc_submit' : 'click',
-            beforeEncryption: function(){ 
-                form.removeAttr('disabled');// form element hack ( IE11 )
-                return true;
+                $.extend(jCryptionMod, $.jCryption);
+                $.jCryption = jCryptionMod;
+            })(jQuery);
+            </script>");
             }
-        });
-    }); </script>"
-                             );
+            if (!String.IsNullOrEmpty(formSelector))
+            {
+                var path = HttpContext.Current.Request.Path;
+                sb.Append(@"
+        <script type=""text/javascript"">
+            $(document).ready(function(){
+                $('" + formSelector + @"').jCryption({
+                    getKeysURL: '" + path + @"?getPublicKey=true',
+                    handshakeURL: '" + path + @"?handshake=true'
+                });
+            });
+        </script>");
+            }
+            return new HtmlString(sb.ToString());
         }
 
         private const String jCryptionFormDataKey = "__jcryption_form_data__";
@@ -662,75 +704,120 @@ namespace jCryption
                 return new HtmlString(@"name=""" + HttpUtility.HtmlEncode(name) + @""" value=""" + HttpUtility.HtmlEncode(value) + @""" data-jcryption-item=""true""");
             }
         }
-        public static IHtmlString RenderLoadFormData()
+
+        public static IHtmlString LoadSecureContents()
         {
             if (!Enabled) return new HtmlString(String.Empty);
-
-            var data = (Dictionary<String, String>)HttpContext.Current.Items[jCryptionFormDataKey];
-            if (data == null || data.Count == 0) return new HtmlString(String.Empty);
-            var conv = new System.Web.Script.Serialization.JavaScriptSerializer();
-            String s = conv.Serialize(data);
-
             var path = HttpContext.Current.Request.Path;
 
-            return new HtmlString(
-                    @"<script type=""text/javascript"">
-        $(document).ready(function () {
-            $('form').filter(function () { return !!$(this).data('jCryption'); }).each(function(){
-                var form = $(this);
-                form.find('select[data-jcryption-item],input[data-jcryption-item]').prop('disabled', true );
-                form.data('jCryption').authenticate(function (AESKey) {
-                    var data = '" + System.Web.Security.MachineKey.Encode(Encoding.UTF8.GetBytes(s), System.Web.Security.MachineKeyProtection.All) + @"';
-                    $.ajax({
-                        url: '" + path + @"?decode=true',
-                        dataType: 'json',
-                        type: 'POST',
-                        data: {
-                            data: data
-                        },
-                        success: function (response) {
-                            var data = $.parseJSON($.jCryption.decrypt(response.data, AESKey));
-                            for (var n in data) {
-                                var val = data[n];
-                                if( val == null ) continue;
-                                val = decodeURIComponent( val );
-                                n =  decodeURIComponent( n );
-                                form.find('*[name=""' + n + '""]').each(function () {
-                                    var e = $(this);
-                                    if (e.is('[type=checkbox],[type=radio]')) {
-                                        var ov = e.attr('value');
-                                        if ( ov == val || new RegExp( '(^|,)' + escapeRegExp(ov) + '($|,)' ).test(val) ) {
-                                            e.prop('checked', true);
-                                        }
-                                    } else if (e.is('select[multiple]')) {
-                                        e.find('option[value]').each(function () {
-                                            var ee = $(this), ov = ee.attr('value');
-                                            if ( ov == val || new RegExp( '(^|,)' + escapeRegExp(ov) + '($|,)' ).test(val) ) {
-                                                ee.prop('selected', true);
+            var sb = new StringBuilder(
+        @"<script type=""text/javascript"">
+            $(document).ready(function () {
+                function escapeRegExp(str) {
+                  return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, ""\\$&"");
+                }
+                var url = '" + path + @"';
+                var form = $('<form>');
+                form.jCryption({ getKeysURL: url + '?getPublicKey=true',handshakeURL: url + '?handshake=true' });");
+
+            var data = (Dictionary<String, String>)HttpContext.Current.Items[jCryptionFormDataKey];
+            if (data != null && data.Count > 0){
+                var conv = new System.Web.Script.Serialization.JavaScriptSerializer();
+                String s = conv.Serialize(data);
+                sb.Append(@"
+                    var formdata = '" + System.Web.Security.MachineKey.Encode(Encoding.UTF8.GetBytes(s), System.Web.Security.MachineKeyProtection.All) + @"';
+                ");
+            }
+            sb.Append(@"
+            form.data('jCryption').authenticate(function (AESKey) {
+                $.jCryption.encryptKey(AESKey, function(AESEncryptedKey) {
+                    // load secure contents
+                    $('[data-jcryption-content]').each( function(){
+                        var $target = $(this);
+                        var data = $target.data('jcryptionData');
+                        $.ajax({
+                            url: url + '?decode=true',
+                            dataType: 'json',
+                            type: 'POST',
+                            data: {
+                                data: data, key: AESEncryptedKey
+                            },
+                            success: function (response) {
+                                var html = decodeURIComponent($.jCryption.decrypt(response.data, AESKey));
+                                $target.html(html);
+                            }
+                        });
+                    });
+                    // load secure form
+                    if( formdata ){
+                        $('form').filter(function () { return !!$(this).data('jCryption'); }).each(function(){
+                            var $form = $(this);
+                            $form.find('[data-jcryption-item]').prop('disabled', true );
+                            $.ajax({
+                                url: url + '?decode=true',
+                                dataType: 'json',
+                                type: 'POST',
+                                data: {
+                                    data: formdata, key: AESEncryptedKey
+                                },
+                                success: function (response) {
+                                    var json = $.jCryption.decrypt(response.data, AESKey), data = $.parseJSON(json);
+                                    for (var n in data) {
+                                        var val = data[n];
+                                        if( val == null ) continue;
+                                        val = decodeURIComponent( val );
+                                        n =  decodeURIComponent( n );
+                                        $form.find('*[name=""' + n + '""]').each(function () {
+                                            var e = $(this);
+                                            if (e.is('[type=checkbox],[type=radio]')) {
+                                                var ov = e.attr('value');
+                                                if ( ov == val || new RegExp( '(^|,)' + escapeRegExp(ov) + '($|,)' ).test(val) ) {
+                                                    e.prop('checked', true);
+                                                }
+                                            } else if (e.is('select[multiple]')) {
+                                                e.find('option[value]').each(function () {
+                                                    var ee = $(this), ov = ee.attr('value');
+                                                    if ( ov == val || new RegExp( '(^|,)' + escapeRegExp(ov) + '($|,)' ).test(val) ) {
+                                                        ee.prop('selected', true);
+                                                    }
+                                                });
+
+                                            } else {
+                                                e.val(val);
                                             }
                                         });
-
-                                    } else {
-                                        e.val(val);
                                     }
-                                });
-                            }
-                            form.find('select[data-jcryption-item],input[data-jcryption-item]').prop('disabled', false );
-                        
-                        }
-                    });
-                }, function() {
-                // Authentication failed
+                                    $form.find('[data-jcryption-item]').prop('disabled', false );
+                                }
+                            });
+                        });
+                    }
                 });
-            });
-            function escapeRegExp(str) {
-              return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, ""\\$&"");
-            }
-        });
-    </script>"
 
-                );
+            }, function() {
+            // Authentication failed
+            });");
+            sb.Append(@"});</script>");
+            return new HtmlString(sb.ToString());
+        }
 
+        private static IHtmlString SecureContent(String html, String textType = "html")
+        {
+            return new HtmlString("<div data-jcryption-content='" + textType + "' data-jcryption-data='" +
+                System.Web.Security.MachineKey.Encode(System.Text.Encoding.UTF8.GetBytes(HttpUtility.UrlPathEncode(textType == "html" 
+                    ? html
+                    : HttpUtility.HtmlEncode(html))), System.Web.Security.MachineKeyProtection.All) + "'></div>");
+        }
+
+        public static IHtmlString SecureHtml( String html )
+        {
+            if (HttpContext.Current.Request.IsSecureConnection) return new HtmlString(html);
+            return SecureContent(html, "html");
+        }
+        public static IHtmlString SecureText(String text)
+        {
+            if (HttpContext.Current.Request.IsSecureConnection) return new HtmlString( HttpUtility.HtmlEncode( text ) );
+            return SecureContent( text, "text");
         }
     }
 }

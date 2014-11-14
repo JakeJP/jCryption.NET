@@ -14,14 +14,20 @@ What's notable of this ASP.NET server side library:
 
   - Respecting original jCryption protocol (OpenSSL PEM style format and negotiation)
   - OpenSSL independent ( using .NET native RSA/AES crypto library )
-  - RSA keys are automatically generated
+  - RSA keys are automatically generated on server side (no need of PEM file preparation)
   - Integration with ASPX and CSHTML (WebPages) Request.Form is automatically replaced with decrypted content.
   - Silently deactivates under HTTPS secure connection ( with cshtml helper methods )
   - load initial form data through encryption ( with CSHTML helper )
+  - load encrypted HTML content rendering support (1.2)
+  - Compatibility with jquery.validate
    
   
 Version
 ----
+####1.3
+ - Refactor of CSHTML helper functions
+####1.2
+ - Encrypted HTML content rendering support (CSHTML)
 ####1.1
  - jCryption version 3.1.0
  - secure form data loading ( on CSHTML )
@@ -30,6 +36,14 @@ Version
  - now works with jquery.validate
 
 ####1.0
+
+Suggestions for original jCryption
+---
+ - AESKey may be only one per page over multiple forms on the same page, since server-side holds only one key in the session state ( with the implementation of PHP ).
+ - AESKey may be posted with encrypted form data together, which allows browser re-post form (by F5 refresh).
+ - Server side handler should be neutral ( not bound to PHP, cgi, ASPX ). Url of server handlers are written hard coded in .js. Only one Server side end point should be supplied as an URL in an option parameter. 'handshake' 'getPublicKey' are its variants by query strings.
+ - Handle form's submit event (not click). 'click' event occurs before form validation for example.
+ - if AES key is attached to encrypted form post with 'jCryption'? This makes form post 'session' independent and allows form re-post by pressing F5.
 
 Dependency
 ---
@@ -118,13 +132,15 @@ is used for checkbox and radio type input element.
     <input type='checkbox' @jCryption.SecureNameValueCheck("Animal", "Cat", false ) />
 ```
 
-####@jCryption.RenderLoadFormData()
+####@jCryption.RenderLoadFormData() [deleted]
+
+####@jCryption.LoadSecureContents()
 must be placed after all SecureNameValue* funtion calls.
 This renders a javascript block with encrypted form values, which are to be decrypted through server-client negotiation. Form elements are filled in javascript calls.
 
 License
 ----
-
+Same as original jCryption,
 MIT
 
 [Jake Y.Yoshimura]: http://www.yo-ki.com/
