@@ -1,11 +1,11 @@
 ﻿/*
- * jCryption.NET v 1.3
+ * jCryption.NET v 1.3.1
  * is a server side implementation for jCryption v3.0 and ASP.NET
  * written by Jake.Y.Yoshimura
  * MIT license.
  * http://www.opensource.org/licenses/mit-license.php
  * 
- * jCryption client side library is originated by Daniel Griesser:
+ * jCryption client side library is originally created by Daniel Griesser:
  * http://www.jcryption.org/
  * 
  * Some SSL related methods are from http://www.jensign.com/opensslkey/opensslkey.cs
@@ -378,18 +378,21 @@ namespace jCryption
                 {
                     tempForm = HttpUtility.ParseQueryString(sr.ReadToEnd());
                 }
-                //
-                var collection = HttpContext.Current.Request.Form;
-                // Get the "IsReadOnly" protected instance property.
-                var propInfo = collection.GetType().GetProperty("IsReadOnly", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                // Mark the collection as NOT "IsReadOnly"
-                propInfo.SetValue(collection, false, new object[] { });
-                foreach (var k in tempForm.AllKeys)
+               
+                foreach (NameValueCollection collection in new[] { Request.Form, System.Web.Helpers.Validation.Unvalidated(Request).Form })
                 {
-                    collection[k] = tempForm[k];
+                    // Get the "IsReadOnly" protected instance property.
+                    var propInfo = collection.GetType().GetProperty("IsReadOnly", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    // Mark the collection as NOT "IsReadOnly"
+                    propInfo.SetValue(collection, false, new object[] { });
+                    foreach (var k in tempForm.AllKeys)
+                    {
+                        collection[k] = tempForm[k];
+                    }
+                    propInfo.SetValue(collection, true, new object[] { });
+
                 }
-                propInfo.SetValue(collection, true, new object[] { });
-                //
+
             }
 
         }
@@ -599,7 +602,7 @@ namespace jCryption
         /// </example>
         /// <param name="formSelector">jQuery selector, which specifies the 'form' element.</param>
         /// <returns></returns>
-        public static IHtmlString RenderScriptFor(String formSelector, String src = null )
+        public static IHtmlString RenderScriptFor(String formSelector, String src = null, IHtmlString script = null )
         {
             if (!Enabled) return null;
             var sb = new StringBuilder();
@@ -641,6 +644,7 @@ namespace jCryption
             })(jQuery);
             </script>");
             }
+            if (script != null) sb.Append(script.ToHtmlString());
             if (!String.IsNullOrEmpty(formSelector))
             {
                 var path = ServiceUrl;

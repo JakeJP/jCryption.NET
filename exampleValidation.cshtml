@@ -1,0 +1,117 @@
+﻿@using jCryption
+@{
+    jCryption.HandleRequest(Request);
+    bool successfulPost = false;
+    Validation.RequireFields("FIrstname", "Password");
+    if (IsPost)
+    {
+        AntiForgery.Validate();
+        if (Validation.IsValid()) {
+            successfulPost = true;
+        }
+    }
+}
+<!doctype html>
+<html>
+<head>
+    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    @jCryption.RenderScriptFor("#normal", "Scripts/jquery.jcryption.3.1.0.js")
+</head>
+
+<body>
+    <h1>cshtml razor example with Validation helper</h1>
+    <div>
+        <ul>
+            <li>Encrypt posted data by jCryption (client to server)</li>
+            <li>Encrypt initially filled form data (server to client)</li>
+            <li>Encrypt HTML content</li>
+        </ul>
+
+    </div>
+    @Html.ValidationSummary()
+    <form id="normal" class="general" method="post">
+        @AntiForgery.GetHtml()
+        <fieldset>
+            <table border="0" cellspacing="5" cellpadding="0">
+                <tbody>
+                    <tr>
+                        <td>Sex:</td>
+                        <td>
+                            <input class="radio" type="radio" @jCryption.SecureNameValueCheck("Sex", "male", true ) />Male
+
+                            <input class="radio" type="radio" @jCryption.SecureNameValueCheck("Sex", "female") />Female
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Firstname:</td>
+                        <td><input class="text" type="text" @jCryption.SecureNameValue("Firstname", "John") @Validation.For("Firstname") /></td>
+                    </tr>
+                    <tr>
+                        <td>Lastname:</td>
+                        <td><input class="text" type="text" @jCryption.SecureNameValue("Lastname", "Wayne") /></td>
+                    </tr>
+                    <tr>
+                        <td>E-Mail:</td>
+                        <td><input class="text" type="text" @jCryption.SecureNameValue("Email", "john@wayne.com") /></td>
+                    </tr>
+                    <tr>
+                        <td>What would you like to eat?</td>
+                        <td>
+                            <input class="checkbox" type="checkbox" @jCryption.SecureNameValueCheck("Food[]", "pizza", true) />Pizza
+
+                            <input class="checkbox" type="checkbox" @jCryption.SecureNameValueCheck("Food[]", "hamburger", false) />Hamburger
+
+                            <input class="checkbox" type="checkbox" @jCryption.SecureNameValueCheck("Food[]", "salad", true) />Salad
+
+                            <input class="checkbox" type="checkbox" @jCryption.SecureNameValueCheck("Food[]", "steak", false) />Steak
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Age:</td>
+                        <td><select @jCryption.SecureNameValue("age", "over 18")> <option value="under 18">under 18</option> <option value="over 18">over 18</option> <option value="over 30">over 30</option> </select></td>
+                    </tr>
+                    <tr valign="top">
+                        <td valign="top">I like (you can select more than one):</td>
+                        <td>
+                            <select name="likes[]" size="5" multiple="multiple" @jCryption.SecureNameValue("likes[]", "rainy wheater,small cats")> <option value="Michael Jackson">Michael Jackson</option> <option value="rainy wheater">rainy wheater</option> <option value="a hot summer">a hot summer</option> <option value="small cats">small cats</option> <option value="funny movies">funny movies</option> <option value="I like everything" selected="selected">I like everything</option> </select></td>
+                    </tr>
+                    <tr>
+                        <td>Password</td>
+                        <td>
+                            <input type="password" @jCryption.SecureNameValue("Password", "password") @Validation.For("Password") />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Comment</td>
+                        <td>
+                            <textarea @jCryption.SecureNameValue("Comment", "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa.")></textarea>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td><input title="Submit" alt="Submit" name="submitButton" type="submit" value="Submit" class="submit" /> <input title="Reset" alt="Reset" name="reset" type="reset" value="Reset" /></td>
+                    </tr>
+                </tbody>
+            </table>
+        </fieldset>
+    </form>
+    <h3>Encrypted Text Content</h3>
+    <div style="border: solid; padding: 1em;">
+        @jCryption.SecureText(@"Lorem ipsum dolor <tag> sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla consequat massa quis enim. Donec pede justo, fringilla vel, aliquet nec, vulputate eget, arcu. In enim justo, rhoncus ut, imperdiet a, venenatis vitae, justo. Nullam dictum felis eu pede mollis pretium. Integer tincidunt. Cras dapibus. Vivamus elementum semper nisi. Aenean vulputate eleifend tellus. Aenean leo ligula, porttitor eu, consequat vitae, eleifend ac, enim. Aliquam lorem ante, dapibus in, viverra quis, feugiat a, tellus. Phasellus viverra nulla ut metus varius laoreet. Quisque rutrum. Aenean imperdiet. Etiam ultricies nisi vel augue. Curabitur ullamcorper ultricies nisi. Nam eget dui. Etiam rhoncus. Maecenas tempus, tellus eget condimentum rhoncus, sem quam semper libero, sit amet adipiscing sem neque sed ipsum. Nam quam nunc, blandit vel, luctus pulvinar, hendrerit id, lorem. Maecenas nec odio et ante tincidunt tempus. Donec vitae sapien ut libero venenatis faucibus. Nullam quis ante. Etiam sit amet orci eget eros faucibus tincidunt. Duis leo. Sed fringilla mauris sit amet nibh. Donec sodales sagittis magna. Sed consequat, leo eget bibendum sodales, augue velit cursus nunc,")
+    </div>
+    <h3>Encrypted HTML Content</h3>
+    <div style="border: solid; padding: 1em;">
+        @jCryption.SecureHtml(@"<ul>
+            <li>Line 1</li>
+            <li>Line 2</li></ul>")
+    </div>
+    @jCryption.LoadSecureContents()
+    <h1 @Html.Raw(successfulPost ? "" : "style='display:none'")>Successful POST</h1>
+    <ul>
+        @foreach (var _k in Request.Form.AllKeys)
+        {
+            <li><b>@_k</b> = <span>@Request.Form[_k]</span></li>
+        }
+    </ul>
+</body>
+</html>

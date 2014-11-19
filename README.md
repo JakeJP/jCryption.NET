@@ -24,10 +24,16 @@ What's notable of this ASP.NET server side library:
   
 Version
 ----
+####1.3.1
+ - fix for Unvalidated Form problem
+ - add script parameter for RenderScript
+
 ####1.3
  - Refactor of CSHTML helper functions
+
 ####1.2
  - Encrypted HTML content rendering support (CSHTML)
+
 ####1.1
  - jCryption version 3.1.0
  - secure form data loading ( on CSHTML )
@@ -89,11 +95,15 @@ Make ASPX page inherit jCryption.SecurePage. SecurePage handles the negotiations
  1. declare namespace access to 'jCryption' on the top of page.```@using jCryption```
  2. call ```jCryption.HandleRequest(Request)``` on the top of page to handle all background negotiations.
  3. include all depending scripts ( jQuery )
- 3. call ```@jCryption.RenderScriptFor("jQuery selector for form", "path to jcryption.js *optional*")``` in the page ( typically in head ). ( in the case with jquery validate, code should be placed after jquery.validate include. )
+ 4. call ```@jCryption.RenderScriptFor(...)``` in the page ( typically in head ). ( in the case with jquery validate, code should be placed after jquery.validate include. )
+
+####@jCryption.RenderScriptFor( String selector, String src = null, String script = null )
+
+ **selector**: jQuery selector to select 'form'
+ **src**: javascript source to include. Usually an url to jquery.jcryption.xxx.js
+ **script**: include a whole script block as HTML, <script src....>
 
  
-
-
 ```cs
 @using jCryption
 @{
@@ -103,7 +113,7 @@ Make ASPX page inherit jCryption.SecurePage. SecurePage handles the negotiations
 <html>
 <head>
     <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
-    @jCryption.RenderScriptFor("#normal", "Scripts/jquery.jcryption.3.1.0.js")
+    @jCryption.RenderScriptFor("#normal", src: "Scripts/jquery.jcryption.3.1.0.js")
 </head>
 ......
 <form id="normal">
@@ -112,6 +122,8 @@ Make ASPX page inherit jCryption.SecurePage. SecurePage handles the negotiations
 ......
 
 ```
+
+
 
 ###CSHTML page with secure initial form data loading
 jCryption provides a way to encrypt client to server data transfer but it does not protect form values that are initially rendered by server in a HTML form like ```<input name='Name' value='Smith' />```
