@@ -24,6 +24,9 @@ What's notable of this ASP.NET server side library:
   
 Version
 ----
+####1.3.2
+ - fix RenderScriptFor src, script parameter handling
+
 ####1.3.1
  - fix for Unvalidated Form problem
  - add script parameter for RenderScript

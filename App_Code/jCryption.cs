@@ -1,5 +1,5 @@
 ﻿/*
- * jCryption.NET v 1.3.1
+ * jCryption.NET v 1.3.2
  * is a server side implementation for jCryption v3.0 and ASP.NET
  * written by Jake.Y.Yoshimura
  * MIT license.
@@ -606,8 +606,10 @@ namespace jCryption
         {
             if (!Enabled) return null;
             var sb = new StringBuilder();
-            if (!String.IsNullOrEmpty(src)) { 
-                sb.Append(@"<script type=""text/javascript"" src=""" + src + @"""></script>");
+            if (script != null) sb.Append(script.ToHtmlString());
+            if (!String.IsNullOrEmpty(src)) sb.Append(@"<script type=""text/javascript"" src=""" + src + @"""></script>");
+            if (!String.IsNullOrEmpty(src) || script != null )
+            { 
                 sb.Append(@"
             <script type=""text/javascript"">
             // tweak for compatibility with jquery.validate
@@ -644,7 +646,6 @@ namespace jCryption
             })(jQuery);
             </script>");
             }
-            if (script != null) sb.Append(script.ToHtmlString());
             if (!String.IsNullOrEmpty(formSelector))
             {
                 var path = ServiceUrl;

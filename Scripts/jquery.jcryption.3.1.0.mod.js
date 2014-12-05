@@ -40,21 +40,22 @@
         var $submitElement = base.$el.find(":input:submit");
       }
 
-      $submitElement.bind(base.options.submitEvent, function() {
+      $submitElement.bind(base.options.submitEvent, function (event) {
+        var target = $(event.target);
         $(this).attr("disabled", true);
         if (base.options.beforeEncryption()) {
           base.authenticate(
             function (AESEncryptionKey, encryptedKey) {
               var toEncrypt = base.$el.serialize();
-              if ($submitElement.is(":submit")) {
-                toEncrypt = toEncrypt + "&" + $submitElement.attr("name") + "=" + $submitElement.val();
+              if (target.is(":submit[name]") ) {
+                toEncrypt = toEncrypt + "&" + target.attr("name") + "=" + target.val();
               }
               $encryptedElement.val($.jCryption.encrypt(toEncrypt, AESEncryptionKey));
               $(base.$el).find(base.options.formFieldSelector)
               .attr("disabled", true).end()
               .append($encryptedElement)
               .append($("<input/>").attr("name", "key").val(encryptedKey))
-                  .submit();
+              .submit();
             },
             function() {
             	// Authentication with AES Failed ... sending form without protection

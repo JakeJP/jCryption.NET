@@ -2,7 +2,7 @@
 @{
     jCryption.HandleRequest(Request);
     bool successfulPost = false;
-    Validation.RequireFields("FIrstname", "Password");
+    Validation.RequireFields("Firstname", "Password");
     if (IsPost)
     {
         AntiForgery.Validate();
@@ -15,7 +15,10 @@
 <html>
 <head>
     <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
-    @jCryption.RenderScriptFor("#normal", "Scripts/jquery.jcryption.3.1.0.js")
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.13.1/jquery.validate.js"></script>
+    <script src="//ajax.aspnetcdn.com/ajax/mvc/5.1/jquery.validate.unobtrusive.js"></script>
+
+    @jCryption.RenderScriptFor("#normal", "Scripts/jquery.jcryption.3.1.0.mod.js")
 </head>
 
 <body>
@@ -44,7 +47,7 @@
                     </tr>
                     <tr>
                         <td>Firstname:</td>
-                        <td><input class="text" type="text" @jCryption.SecureNameValue("Firstname", "John") @Validation.For("Firstname") /></td>
+                        <td><input class="text" type="text" @jCryption.SecureNameValue("Firstname", "John") @Validation.For("Firstname") />@Html.ValidationMessage("Firstname")</td>
                     </tr>
                     <tr>
                         <td>Lastname:</td>
@@ -78,7 +81,7 @@
                     <tr>
                         <td>Password</td>
                         <td>
-                            <input type="password" @jCryption.SecureNameValue("Password", "password") @Validation.For("Password") />
+                            <input type="password" @jCryption.SecureNameValue("Password", "password") @Validation.For("Password") />@Html.ValidationMessage("Password")
                         </td>
                     </tr>
                     <tr>
