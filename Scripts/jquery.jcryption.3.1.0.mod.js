@@ -12,11 +12,13 @@
 * .mod. version with some tweaks added by yo-ki@yo-ki.com
 *  - allows form re-posting by pressing F5 or browser refresh ( posting AES key together with form data )
 *  - share AES key amoung multiple forms on the same page
+*  - handles form's submit event ( not click event ) by default
+*  - handles input with 'image' type
 */
 (function ($) {
-    var gl_key, gl_keyEncrypted;
-    var gl_publicKeyLoaded = false;
-    var gl_authenticated = false;
+  var gl_key, gl_keyEncrypted;
+  var gl_publicKeyLoaded = false;
+  var gl_authenticated = false;
   $.jCryption = function(el, options) {
     var base = this;
 
@@ -29,7 +31,7 @@
     base.init = function() {
       base.options = $.extend({}, $.jCryption.defaultOptions, options);
 
-      $encryptedElement = $("<input />",{
+      var $encryptedElement = $("<input />",{
         type:'hidden',
         name:base.options.postVariable
       });
@@ -37,40 +39,51 @@
       if (base.options.submitElement !== false) {
         var $submitElement = base.options.submitElement;
       } else {
-        var $submitElement = base.$el.find(":input:submit");
+        var $submitElement = base.$el.find(":input:submit,:image");
       }
-
-      $submitElement.bind(base.options.submitEvent, function (event) {
-        var target = $(event.target);
-        $(this).attr("disabled", true);
-        if (base.options.beforeEncryption()) {
-          base.authenticate(
-            function (AESEncryptionKey, encryptedKey) {
-              var toEncrypt = base.$el.serialize();
-              if (target.is(":submit[name]") ) {
-                toEncrypt = toEncrypt + "&" + target.attr("name") + "=" + target.val();
-              }
-              $encryptedElement.val($.jCryption.encrypt(toEncrypt, AESEncryptionKey));
-              $(base.$el).find(base.options.formFieldSelector)
-              .attr("disabled", true).end()
-              .append($encryptedElement)
-              .append($("<input/>").attr("name", "key").val(encryptedKey))
-              .submit();
-            },
-            function() {
-            	// Authentication with AES Failed ... sending form without protection
-            	confirm("Authentication with Server failed, are you sure you want to submit this form unencrypted?", function() {
-                 	$(base.$el).submit();
-            	});
-        	}
-          );
+      var lastClicked = null;
+      $submitElement.click(function (event) {
+          lastClicked = $(event.target);
+      });
+      base.$el.on( base.options.submitEvent, function (event) {
+        var target = lastClicked;
+        target.attr("disabled", true);
+        if (base.$el.data('_jc_in') === true) {
+            base.$el.removeData('_jc_in');
+        } else {
+            base.$el.data('_jc_in', true);
+            event.preventDefault();
+            if (base.options.beforeEncryption()) {
+              base.authenticate(
+                function (AESEncryptionKey, encryptedKey) {
+                  var toEncrypt = base.$el.serialize();
+                  if (target.is(":image")) {
+                    var _n = target.attr("name") || ""; if (_n) _n += ".";
+                      toEncrypt = toEncrypt + "&" + _n + "x=0&" + _n + "y=0";
+                    } else if (target.is(":submit[name]") ) {
+                      toEncrypt = toEncrypt + "&" + target.attr("name") + "=" + target.val();
+                    }
+                  $encryptedElement.val($.jCryption.encrypt(toEncrypt, AESEncryptionKey));
+                  $(base.$el).find(base.options.formFieldSelector)
+                  .attr("disabled", true).end()
+                  .append($encryptedElement)
+                  .append($("<input />", { type: 'hidden', name: 'key', value: encryptedKey }))
+                  .submit();
+                },
+                function() {
+            	    // Authentication with AES Failed ... sending form without protection
+            	    confirm("Authentication with Server failed, are you sure you want to submit this form unencrypted?", function() {
+                 	    $(base.$el).submit();
+            	    });
+        	    }
+              );
+            }
+            return false;
         }
-        return false;
       });
     };
 
     base.init();
-
     /**
     * Creates a random string(key) for use in the AES algorithm
     */
@@ -233,7 +246,7 @@
 
   $.jCryption.defaultOptions = {
     submitElement: false,
-    submitEvent: "click",
+    submitEvent: "submit",
     getKeysURL: "jcryption.php?getPublicKey=true",
     handshakeURL: "jcryption.php?handshake=true",
     beforeEncryption: function() { return true },

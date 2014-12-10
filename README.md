@@ -24,6 +24,9 @@ What's notable of this ASP.NET server side library:
   
 Version
 ----
+####1.3.2 update
+ - updated jcryption.3.1.0.mod.js and exsmples
+
 ####1.3.2
  - fix RenderScriptFor src, script parameter handling
 
