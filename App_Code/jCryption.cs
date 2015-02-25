@@ -325,7 +325,7 @@ namespace jCryption
             {
                 var data = System.Web.Security.MachineKey.Decode(Request.Form["data"], System.Web.Security.MachineKeyProtection.All);
 
-                byte[] keyDecrypted = Request.Form["key"] != null ? cryptoProvider.Decrypt(Convert.FromBase64String(Request.Form["key"]), false) : (byte[])Session[SessionKeyStoreKey];
+                byte[] keyDecrypted = Request.Form["jCryptionKey"] != null ? cryptoProvider.Decrypt(Convert.FromBase64String(Request.Form["jCryptionKey"]), false) : (byte[])Session[SessionKeyStoreKey];
                 if (keyDecrypted == null)
                 {
                     Response.StatusCode = 412;
@@ -360,7 +360,7 @@ namespace jCryption
             else if (Request.Form["jCryption"] != null)
             {
                 NameValueCollection tempForm;
-                byte[] keyDecrypted = Request.Form["key"] != null ? cryptoProvider.Decrypt(Convert.FromBase64String(Request.Form["key"]), false) : (byte[])Session[SessionKeyStoreKey];
+                byte[] keyDecrypted = Request.Form["jCryptionKey"] != null ? cryptoProvider.Decrypt(Convert.FromBase64String(Request.Form["jCryptionKey"]), false) : (byte[])Session[SessionKeyStoreKey];
                 if (keyDecrypted == null)
                 {
                     Response.StatusCode = 412;
@@ -652,9 +652,11 @@ namespace jCryption
                 sb.Append(@"
         <script type=""text/javascript"">
             $(document).ready(function(){
-                $('" + formSelector + @"').jCryption({
-                    getKeysURL: '" + path + @"?getPublicKey=true',
-                    handshakeURL: '" + path + @"?handshake=true'
+                var form = $('" + formSelector + @"');
+                var url = form.attr('action') || '" + path + @"';
+                form.jCryption({
+                    getKeysURL: url + '?getPublicKey=true',
+                    handshakeURL: url + '?handshake=true'
                 });
             });
         </script>");
