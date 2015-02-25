@@ -47,12 +47,14 @@
       });
       base.$el.on( base.options.submitEvent, function (event) {
         var target = lastClicked;
-        target.attr("disabled", true);
         if (base.$el.data('_jc_in') === true) {
             base.$el.removeData('_jc_in');
         } else {
             base.$el.data('_jc_in', true);
             event.preventDefault();
+            if (target.is(":image,:submit[name]")) {
+                target.prop('disabled', true);
+            }
             if (base.options.beforeEncryption()) {
               base.authenticate(
                 function (AESEncryptionKey, encryptedKey) {
@@ -67,7 +69,7 @@
                   $(base.$el).find(base.options.formFieldSelector)
                   .attr("disabled", true).end()
                   .append($encryptedElement)
-                  .append($("<input />", { type: 'hidden', name: 'key', value: encryptedKey }))
+                  .append($("<input />", { type: 'hidden', name: 'jCryptionKey', value: encryptedKey }))
                   .submit();
                 },
                 function() {
