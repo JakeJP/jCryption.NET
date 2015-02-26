@@ -9,7 +9,7 @@
 * If you need any further information about this plugin please
 * visit my homepage or contact me under daniel.griesser@jcryption.org
 *
-* .mod. version with some tweaks added by yo-ki@yo-ki.com
+* .mod. version has some tweaks added by yo-ki@yo-ki.com
 *  - allows form re-posting by pressing F5 or browser refresh ( posting AES key together with form data )
 *  - share AES key amoung multiple forms on the same page
 *  - handles form's submit event ( not click event ) by default

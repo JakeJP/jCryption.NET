@@ -1,7 +1,9 @@
 ﻿/*
- * jCryption.NET v 1.3.2
+ * jCryption.NET v 1.3.3
  * is a server side implementation for jCryption v3.0 and ASP.NET
  * written by Jake.Y.Yoshimura
+ * https://github.com/JakeJP/jCryption.NET
+ * 
  * MIT license.
  * http://www.opensource.org/licenses/mit-license.php
  * 
